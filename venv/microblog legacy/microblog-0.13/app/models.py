@@ -3,6 +3,7 @@ from hashlib import md5
 from time import time
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+from json import *
 import jwt
 from app import app, db, login
 
@@ -22,7 +23,7 @@ class User(UserMixin, db.Model):
     # posts = db.relationship('Post', backref='author', lazy='dynamic')
     about_me = db.Column(db.String(140))
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
-    authenticated = db.Column(db.Boolean)
+    authenticated = db.Column(db.Boolean, default=False, nullable=False)
     # followed = db.relationship(
     #     'User', secondary=followers,
     #     primaryjoin=(followers.c.follower_id == id),
@@ -43,42 +44,32 @@ class User(UserMixin, db.Model):
         return 'https://www.gravatar.com/avatar/{}?d=identicon&s={}'.format(
             digest, size)
 
-    # def follow(self, user):
-    #     if not self.is_following(user):
-    #         self.followed.append(user)
-
-    # def unfollow(self, user):
-    #     if self.is_following(user):
-    #         self.followed.remove(user)
-
-    # def is_following(self, user):
-    #     return self.followed.filter(
-    #         followers.c.followed_id == user.id).count() > 0
-
-    # def followed_posts(self):
-    #     followed = Post.query.join(
-    #         followers, (followers.c.followed_id == Post.user_id)).filter(
-    #             followers.c.follower_id == self.id)
-    #     own = Post.query.filter_by(user_id=self.id)
-    #     return followed.union(own).order_by(Post.timestamp.desc())
-
     def get_reset_password_token(self, expires_in=600):
         return jwt.encode(
             {'reset_password': self.id, 'exp': time() + expires_in},
             app.config['SECRET_KEY'], algorithm='HS256').decode('utf-8')
 
     #to authenticae users.
-    def generate_account_comfirmation_token(self, expires_in=600):
+    # acc confirmation expires in 7 days.
+    # -- must add additional function to send another authentication email.
+    def generate_account_confirmation_token(self, expires_in=10080):
         return jwt.encode({'auth_req': self.id, 'exp': time() + expires_in}, app.config['SECRET_KEY'], algorithm='HS256').decode('utf-8')
-        
 
     @staticmethod
     def verify_reset_password_token(token):
         try:
-            id = jwt.decode(token, app.config['SECRET_KEY'],
-                            algorithms=['HS256'])['reset_password']
+            id = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])['reset_password']
         except:
             return
+        return User.query.get(id)
+
+    @staticmethod
+    def verify_account_confirmation_token(token):
+        try:
+            id = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])['auth_req']
+        except:
+            return None
+        
         return User.query.get(id)
 
 

@@ -1,0 +1,15 @@
+Dear {{ user.username }},
+
+Thanks for signing up with the Cloud-Based Authentication System! You must follow this link to activate your account:
+
+{{ url_for('confirm_account', token=token, _external=True) }}"
+
+Alternatively, you can paste the following link in your browser's address bar:
+
+{{ url_for('confirm_account', token=token, _external=True) }}
+
+If you have not requested a password reset simply ignore this message.
+
+Sincerely,
+
+The CBBAS Team

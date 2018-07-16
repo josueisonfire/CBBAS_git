@@ -1,0 +1,365 @@
+App requisites:
+
+1. Instuctor must be able to log in into the system, view attendance data of various classes (selection), have email verification, password recovery support, edit attendance data, and a tool for mapping attendance IDs from the scanner to the actual attendee in the database.
+
+    <FLASK-mail>
+
+    process for pw recovery -- finished
+
+    process for account confirmation -- finished
+        
+    tools for mapping attendance : -- TBD
+
+
+
+2. Database must contain models for each class and a platform to add students. (for now, make it simple.) Also, database must have all helper objects and classes to facilitate specific functions. Must additionally implement all necessary queries.
+    i. MODELS:
+        a. CLASS - basic class model. contains information on:
+            id                  - int                                           NULLABLE?: False        PRIMARY_KEY
+                Basic Class id number. Foreign key to owner of the class, the Instructor. (backref Instructor.)
+            
+            class name          - String(100)                                   NULLABLE?: False
+            
+            class start date    - python datetime object                        NULLABLE?: False
+            
+            class end date      - python datetime object                        NULLABLE?: False
+
+            class schedule      - String(250)                                   NULLABLE?: False
+                arr. - class days (must be a series of strings which will later be parsed.)
+                    e.g.:   {(MON, 17:00, 18:30),(WED, 17:00, 18:30), (WED, 20:00, 22:00)} -- which entails that the class runs on both Monday and Wednesday, a total of three classes per week, with two overlaps in Wednesday. Information will be parsed. 
+
+                    The string must be created using a function within the database. 
+                            .
+                            . Appears in 3 forms: 
+                                "Add Class"
+                                "Add Class Schedule"
+                                "Edit Class Schedule"
+                            .
+
+                            NOTE: Prior to any of the following operations, the Class schedule string attribute must be converted to a list of <CLASS_DAY> objects.
+
+                            BASE: 
+                            FORM: "Add Class Schedule"
+                                DAY:        WTF-SelectField (Day) <Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Friday>
+                                START_TIME: WTF-Timefield (00:00 - 23:59, MIN_MAX = 59. {xx:00 ~ xx:59}, HR_MAX = 23, {00:xx ~ 23:xx})
+                                END_TIME:   WTF-Timefield (00:00 - 23:59, MIN_MAX = 59. {xx:00 ~ xx:59}, HR_MAX = 23, {00:xx ~ 23:xx})
+                            
+                            
+
+                            FORM: "Delete Class Schedule"
+                            
+                            PARSER:
+                                1. ignore {}
+                                2. detect '('
+                                3. DET which day it is: if Str = MON || TUE || WED || THU || FRI || SAT || SUN , make <CLASS_DAY> object and init wth the date, which will be stored into a <CLASS_DAY> object python list.
+                                4. detect ',' - marks end of day detection, start beginning of <CLASS_DAY> object's <start_time> attribute.
+                                5. store  'start_time' attribte in <CLASS_DAY> object.
+                                6. setect ',' - marks end of <start_time> attribute, marks beginning of <end_time> attribute.
+                                7. store  'end_time' attribute in the <CLASS_DAY> object.
+                                8. finilize object initiation by detecting a ')'.
+                                <ERROR CONDITION>: if unexpected str values are seen, raise <Incorrect_dataformat> exception for logging. (means there has been some data corruption.)
+                                repeat until character is NULL.
+
+            class' Instuctor    - Integer                                       NULLABLE?: False
+                Foreign key for <Instuctor Model> <MAY NOT BE REQUIRED through BACKREF!>
+            class att. data.    - Integer                                       NULLABLE?: False
+                Sequence of interger IDs. (String).
+            class student list. - model.                                        NULLABLE?: True
+            tardy tolerance     - Integer                                       NULLABLE?: True
+                DEFAULT: 5
+                specification on how many minutes of tolerance is given from the start of class to mark attendance.
+                e.g.: class starts at 15:00, with a tolerance of 15 minutes. If a student marks attendance at 15:08, it is marked as safe (no penalty) However, if a student marks attendancee at 15:18, it is marked as tardy.
+            authenticated       - Boolean                                       NULLABLE>: False.
+                DEFAULT: FALSE
+
+
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            |     R E L A T I O S H I P S      |
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+                i.      CLASS - INSTRUCTOR
+                            type: N : 1  many to one
+                                def. in Instructor (User).
+                                Called from Instructor. User.class (query)
+                ii.     CLASS - ATTENDANCE
+                            type: 1 : N  one to many
+                                def. in class.
+                                Called from Class. Class.attendance (query)
+                iii.    CLASS - STUDENT
+                            type: 1 : N  one to many
+                                def. in class
+                                Called from Class. Class.student (query)
+                iv.     
+
+
+            CLASS initiation form:
+            
+            <BASE>
+
+            "Add Class"
+
+                -------------------------------------------------------------------------------------------------------------------------------
+                <attribute name>                    <attribute type>                        <WTForms type>
+                class_name:                         String(150)                             WTF-StringField
+                class_start_date                    DateTime                                WTF-DateField
+                class_end_date                      DateTime                                WTF-DateField
+                class_schedule                      String(250) <custom>                    WTF-SelectField, WTF-Timefield
+                class_instructor <Unecessary>       NA                                      NA (Implied at creation)
+                class student list.                 TBD                                     TBD
+                class_tardy_tolerance               Integer                                 WTF-NumberField
+
+
+        b. ATTENDANCE - model containing attendance data. organized by date.
+
+            ID:                 - INT                                               NULLABLE?: False    PRIMARY_KEY
+                Primary Key for the attendance data.
+            class_id            - INT                                               NULLABLE?: False
+                Integer Value fo the CLASS Model's primary key. Used to reference which class' attendance this model belongs to.
+            att_date            - DateTime                                          NULLABLE?: False
+            (Dynamic Column Generation)
+            att_<student_name>* - INT                                               NULLABLE?: True
+            {potentially better if displayed as: att_<SBUID>*}
+
+            algorithm for dynamic column creation: 
+
+                class.students.sbuid (query)
+                add to list.
+                get (size)
+
+                for each sbuid in the list, create additional column.
+            
+            in case of a student deletion, correct attendance data by deleting a column?
+
+                buffer object that hold data -- then make a new attendance model and store it.
+
+            query: class.student
+
+                Column Containing whether or not the student attended the class. 
+                The following values reflect on information of the student's attendance.
+                    -2                      : Student did not attend, but was excused. <Edited in the platform.>
+                    -1                      : Student did not attend.
+                    0                       : Student attended the class on time.
+                    1 ~ <class_duration>    : Student attended class but with a tardy. the value indicates how late the student came into class.
+
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            |     R E L A T I O S H I P S      |
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+            i.          ATTENDANCE - CLASS
+                            type: N : 1 many to one
+                                def in Class.
+                                called from CLASS, Class.attendance (query)
+
+        c. STUDENT - model containing student data.
+
+            NOTE: a student enrolled in multiple classes from a single instructor is NOT represented by a single STUDENT model. i.e., a student will have duplicate values except for the class_id field if the student is enrolled in multiple classes from a single instructor.
+
+            ID:                 - INT                                               NULLABLE?: False        PRIMARY_KEY
+            sbuid:              - INT                                               NULLABLE?: False
+                Student's SBUID.
+            class_id            - INT                                               NULLABLE?: False
+                class id in which the student is currently enrolled.
+            first_name          - String(50)                                        NULLABLE?: False
+            last_name           - String(50)                                        NULLABLE?: False
+            scanner_id          - String(250)                                       NULLABLE?: True
+                scanner number id. used to map database student to the scanner student. usually a number between 0 ~ 2000.
+                JSON string containing scanner SN : scanner_id integer.
+                e.g.: {'asdfg-asdfg-asdfg' : 25, 'dfkjh-dfhkj-dfhjk' : 78}
+                , meaning: scanner 'asdfg' registered student as number 25, and scanner dfhjk has registered the student as number 78.
+
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            |     R E L A T I O S H I P S      |
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+            i.          STUDENT - CLASS
+                            type: N : 1 many to one
+                                def. in Class.
+                                called from CLASS, Class.student (query)
+
+        d. INSTRUCTOR - model for main user and instructor of a class.
+
+            ID:                 - INT                                               NULLABLE?: False        PRIMARY_KEY
+            email               - String(100)                                       NULLABLE?: False        
+            password_hash       - String(256)                                       NULLABLE?: False
+            first_name          - String(50)                                        NULLABLE?: False
+            last_name           - String(50)                                        NULLABLE?: False
+
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            |     R E L A T I O S H I P S      |
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+            i.          INSTRUCTOR - CLASS
+                            type: 1 : N one to many
+                                def. in INSTRUCTOR.
+                                called from INSTRUCTOR, Instructor.Class (query)
+
+        e. DEVICE - model for infomration on scanner device.
+
+            ID:                 - INT                                               NULLABLE?: False        PRIMARY_KEY
+            last_synced         - DateTime                                          NULLABLE?: True
+            version             - String(350)                                       NULLABLE?: True
+                checksum of schedule, class students, and other scanner-related data.
+            
+
+    ii. Queries
+        
+        NOTE: basic queries that can be solved with vanilla code are not specified here:
+
+        COMPLEX QUERIES
+
+        FOR DATABASE USE
+
+        FOR SCANNER USE
+
+            SYNC:
+            The device-database sync is a crucial step towards using the system.
+
+            The procedure steps are decribed as the following:
+
+                1. During manufacture finalization, the fingerprint scanner is given a unique serial number. This serial number is used to accurately map attendance data.
+                        INITIAL INIT Information
+                            DATABASE:
+                                list of devices:
+
+                                list =  {
+                                            (
+                                            Device SN:                              <SN> (SN = xxxxx-xxxxx-xxxxx-xxxxx)
+                                            Device AES256 encryption master key:    <256-long master key>
+                                            Device Active Status:                   <active> (Boolean)
+                                            )*n
+                                        }
+                                NOTE: where 'n' is equal to the number of released devices.
+
+                            DEVICE:
+                                Platform_url:                               <API_URL>
+                                Device SN:                                  <SN> (SN = xxxxx-xxxxx-xxxxx-xxxxx)
+                                Device AES256 encryption master key:        <256-long master key>
+                                Device Active Status:                       <Boolean>
+
+
+                2. Instructor registers on the platform.
+                3. Device initiates {powers up, connects to the internet, communicates with server, and gives current status as 'ready_to_pair'}, and displays the initial serial number (also written on the device).
+                4. Instructor goes to '/register scanner' and inputs the serial number.
+                5. Database maps serial number with the instructor.
+                6. Scanner proceeds to create a user profile instructor. Scanner now prompts instructor to register his fingerprint(s).
+                7. After succesful user profile creation, scanner will attempt to sync data with the server.
+                    i.      if no classes are available, quit() <no classes>. CLASSES MUST BE INSTANTIATED ONLINE!
+                    ii.     if classes are available, sync schedule, and student list (SBUID, first & last name)
+                    iii.    during first class, students are prompted to register their fingerprints. if the device already has the names list,     it will prompt students to input their id (provided by the instructor) and display the pre-registered name. after confirmation, the scanner will map the fingerprint template to the student.
+                    iv.      during sync, the scanner will ask for:
+                                a. Additional Classes
+                                b. Changes in students/schedule (special schedules) <version control>
+                                    cases:
+                                        1. DATABASE has no students, but scanner registered students.
+                                            SET_REQUEST:        Add students with scanner id.
+                                c. upload attendance data.
+                                    NOTE: All un-uploaded attendance data will be stored locally after encryption in a file. The upload process will also be encrypted.
+                                    -- all uploaded attendance data must be confirmed. After confirmation, the data will be purged.
+                                    -- if, confirmation halted midway of uploading (database has some or all attendance data within, run checksum if any duplicate attendance data is found (in date). The overwrite said date if checksum failed.
+
+            1. check hash of overall data. If both are equal, then one version is incomplete.
+
+            overall data will be loaded into an object @ login. 
+
+            Sync fileformat:
+
+            (JSON?)
+
+            @authentication
+            Instructor_name
+
+
+            i. get_attendance_information()
+             _______________________
+            |!! ~~ !! prerequisites |
+            @login_required
+            @device_authentication_required
+    iii. Classes
+        
+
+
+
+            
+
+3. Database must contain all model attributes' editing functions, and provide a comprehensive list of objects to analyze and display data.
+
+    CLASS
+        add, edit, del functionalities for:
+
+            class_schedule
+                add class_schedule,
+                    appends to string of class schedule
+                edit class_schedule,
+                    imports existing class schedule and edits it. then save back into string form.
+                del class_schedule.
+                    imports existing class schedule, selects a deletion, and delets it.
+                        raises INVALID_OPERATION exception when attempting to delete the last remaining schedule.
+            
+            In case an unexpected class schedule appears (due to day shifts, or additional one-time special schedules), create special type of command for the fp scanner.
+
+            
+            
+            attendance
+                2 types:
+                    add 
+            student
+
+        
+        query for student:
+        
+
+
+
+model_relationship attributes and necessities list:                         
+
+
+4. Database and scanner communication protocols. (structure, not api)
+
+
+
+5. Database URL structure.
+
+    platform
+    BASE:
+    <domain_url>
+        /login
+            /password_reset_request
+            /password_reset<token>
+            /confirm_account_to_proceed
+            /confirm_account<token>
+        #/login_failed
+        /register
+        
+        /home<{userID}>
+
+
+
+
+
+    API (application Programming interface)
+
+    <domain_url>
+        /api
+            /req
+
+6. SCANNER CODE
+    DIVISIONs:
+        1. encryptor/decryptor
+        2. networking
+        3. vault_
+            stores data. usually encrypted.
+        4. UI - user interface
+        5. RUNTIME_CODE
+            divided further into the following sub-modules
+                a. package_manager
+                    packs/unpacks data from the server.
+                b. GT511C3 fingerprint scanner driver
+                c. user profiles
+                d. class_info
+                e. attendance_data_collector
+                f. class_registration (init)
+
+
+        Main functioanlity - all data will be stored after encryption. The encryptor utilizes a randomly generated string stored in the compiled code (not stored anywhere else). The following structure is used to run the program
+
+                ENCRYPTED-DATA <-- ENCRYPTOR/DECRYPTOR --> RUNTIME_CODE <---> NETWORKING <-- AES256 encryption --> DATABASE

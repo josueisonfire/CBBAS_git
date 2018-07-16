@@ -15,13 +15,13 @@ class LoginForm(FlaskForm):
 
 
 class RegistrationForm(FlaskForm):
-    email = StringField(_l('Email'), validators=[DataRequired(), Email()])
-    username = StringField(_l('Name'), validators=[DataRequired()])
-    password = PasswordField(_l('Password'), validators=[DataRequired()])
+    email = StringField(('Email'), validators=[DataRequired(), Email()])
+    username = StringField(('Name'), validators=[DataRequired()])
+    password = PasswordField(('Password'), validators=[DataRequired()])
     password2 = PasswordField(
-        _l('Repeat Password'), validators=[DataRequired(),
+        ('Repeat Password'), validators=[DataRequired(),
                                            EqualTo('password')])
-    submit = SubmitField(_l('Register'))
+    submit = SubmitField(('Register'))
 
     def validate_username(self, username):
         user = User.query.filter_by(username=username.data).first()
@@ -63,6 +63,8 @@ class EditProfileForm(FlaskForm):
             if user is not None:
                 raise ValidationError(_('Please use a different username.'))
 
+class SendConfirmationEmailForm(FlaskForm):
+    Request = SubmitField(_l('Send confirmation Email'))
 
 class PostForm(FlaskForm):
     post = TextAreaField(_l('Say something'), validators=[DataRequired()])

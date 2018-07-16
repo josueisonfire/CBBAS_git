@@ -4,25 +4,36 @@ from flask_mail import Message
 from flask_babel import _
 from app import app, mail
 
-
+#async thread for email sending.
 def send_async_email(app, msg):
     with app.app_context():
         mail.send(msg)
 
-
+#BASE
 def send_email(subject, sender, recipients, text_body, html_body):
     msg = Message(subject, sender=sender, recipients=recipients)
     msg.body = text_body
     msg.html = html_body
     Thread(target=send_async_email, args=(app, msg)).start()
 
-
+#function to send password recovery request
 def send_password_reset_email(user):
     token = user.get_reset_password_token()
-    send_email(_('[Microblog] Reset Your Password'),
+    send_email(_('[SUNYKOREA CBBAT] Reset Your Password'),
                sender=app.config['ADMINS'][0],
                recipients=[user.email],
                text_body=render_template('email/reset_password.txt',
                                          user=user, token=token),
                html_body=render_template('email/reset_password.html',
+                                         user=user, token=token))
+
+#function to send account confirmation request.
+def send_account_confirmation_email(user):
+    token = user.generate_account_confirmation_token()
+    send_email(_('[SUNYKOREA CBBAT] Confirm Your Account'),
+                sender=app.config['ADMINS'][0],
+                recipients=[user.email],
+               text_body=render_template('email/confirm_email.txt',
+                                         user=user, token=token),
+               html_body=render_template('email/confirm_email.html',
                                          user=user, token=token))

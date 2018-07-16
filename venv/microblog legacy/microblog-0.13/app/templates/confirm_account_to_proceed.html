@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+{% block app_content %}
+    <h1>{{ _('Hi, %(username)s!', username=current_user.username) }}</h1>
+    <h2>{{ _('Confirm your account to proceed!') }}</h2>
+    <p> Didn't get the email? Click here and we will send you another confirmation email!</p>
+    <div class="row">
+            <div class="col-md-4">
+                {{ wtf.quick_form(form) }}
+            </div>
+        </div
+    
+{% endblock %}

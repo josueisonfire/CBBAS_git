@@ -13,6 +13,6 @@ def internal_error(error):
     return render_template('500.html'), 500
 
 # error message for bad requests.
-@app.error_handler(400)
+@app.errorhandler(400)
 def bad_request(error):
     return

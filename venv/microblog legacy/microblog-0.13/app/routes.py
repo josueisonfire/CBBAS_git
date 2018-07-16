@@ -4,10 +4,9 @@ from flask_login import login_user, logout_user, current_user, login_required
 from werkzeug.urls import url_parse
 from flask_babel import _, get_locale
 from app import app, db
-from app.forms import LoginForm, RegistrationForm, EditProfileForm, \
-    ResetPasswordRequestForm, ResetPasswordForm
+from app.forms import LoginForm, RegistrationForm, EditProfileForm, SendConfirmationEmailForm, ResetPasswordRequestForm, ResetPasswordForm
 from app.models import User
-from app.email import send_password_reset_email
+from app.email import send_password_reset_email, send_account_confirmation_email
 
 
 @app.before_request
@@ -22,6 +21,8 @@ def before_request():
 @app.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
+    if current_user.authenticated == False:
+        return redirect(url_for('confirm_account_to_proceed'))
     return render_template('index.html')
 
 
@@ -95,10 +96,45 @@ def reset_password(token):
         return redirect(url_for('login'))
     return render_template('reset_password.html', form=form)
 
+# Page which prompts user to authenticate the email to proceed
+@app.route('/confirm_account_to_proceed', methods=['GET', 'POST'])
+@login_required
+def confirm_account_to_proceed():
+    form = SendConfirmationEmailForm()
+    if current_user.authenticated == True:
+        return redirect(url_for('/index'))
+    if form.validate_on_submit():
+        send_account_confirmation_email(current_user)
+        flash(_('The email has been sent!'))
+    return render_template('confirm_account_to_proceed.html', title='Confirm Your Account!', form=form)
+
+# Page to confirm account. work in progress.
+@app.route('/confirm_account/<token>', methods=['GET', 'POST'])
+@login_required
+def confirm_account(token):
+    if current_user.authenticated == True:
+        return redirect(url_for('index'))
+    else:
+        user = User.verify_account_confirmation_token(token)
+        if not user:
+            flash(_('Oops! Seems like your link has either expired or it has been corrupted!'), 'error')
+        else:
+            # current_user.authenticated == True
+            flash(_('Your email has been confirmed!'))
+            user.authenticated = True
+            db.session.commit()
+    return render_template('confirm_account.html', title='Account Confirmation')
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# API Section                                                                           ||||
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 @app.route('/user/<username>')
 @login_required
 def user(username):
+    if current_user.authenticated == False:
+        return redirect(url_for('confirm_account_to_proceed'))
     user = User.query.filter_by(username=username).first_or_404()
     page = request.args.get('page', 1, type=int)
     return render_template('user.html', user=user)
@@ -107,6 +143,7 @@ def user(username):
 @app.route('/edit_profile', methods=['GET', 'POST'])
 @login_required
 def edit_profile():
+    
     form = EditProfileForm(current_user.username)
     if form.validate_on_submit():
         current_user.username = form.username.data
@@ -121,38 +158,33 @@ def edit_profile():
                            form=form)
 
 
-@app.route('/follow/<username>')
-@login_required
-def follow(username):
-    user = User.query.filter_by(username=username).first()
-    if user is None:
-        flash(_('User %(username)s not found.', username=username))
-        return redirect(url_for('index'))
-    if user == current_user:
-        flash(_('You cannot follow yourself!'))
-        return redirect(url_for('user', username=username))
-    current_user.follow(user)
-    db.session.commit()
-    flash(_('You are following %(username)s!', username=username))
-    return redirect(url_for('user', username=username))
+# @app.route('/follow/<username>')
+# @login_required
+# def follow(username):
+#     user = User.query.filter_by(username=username).first()
+#     if user is None:
+#         flash(_('User %(username)s not found.', username=username))
+#         return redirect(url_for('index'))
+#     if user == current_user:
+#         flash(_('You cannot follow yourself!'))
+#         return redirect(url_for('user', username=username))
+#     current_user.follow(user)
+#     db.session.commit()
+#     flash(_('You are following %(username)s!', username=username))
+#     return redirect(url_for('user', username=username))
 
 
-@app.route('/unfollow/<username>')
-@login_required
-def unfollow(username):
-    user = User.query.filter_by(username=username).first()
-    if user is None:
-        flash(_('User %(username)s not found.', username=username))
-        return redirect(url_for('index'))
-    if user == current_user:
-        flash(_('You cannot unfollow yourself!'))
-        return redirect(url_for('user', username=username))
-    current_user.unfollow(user)
-    db.session.commit()
-    flash(_('You are not following %(username)s.', username=username))
-    return redirect(url_for('user', username=username))
-
-@app.route('/confirm_account')
-@login_required
-def comfirmation_pending(username):
-    return 
+# @app.route('/unfollow/<username>')
+# @login_required
+# def unfollow(username):
+#     user = User.query.filter_by(username=username).first()
+#     if user is None:
+#         flash(_('User %(username)s not found.', username=username))
+#         return redirect(url_for('index'))
+#     if user == current_user:
+#         flash(_('You cannot unfollow yourself!'))
+#         return redirect(url_for('user', username=username))
+#     current_user.unfollow(user)
+#     db.session.commit()
+#     flash(_('You are not following %(username)s.', username=username))
+#     return redirect(url_for('user', username=username))
