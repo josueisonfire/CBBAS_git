@@ -105,9 +105,28 @@ App requisites:
                 class_end_date                      DateTime                                WTF-DateField
                 class_schedule                      String(250) <custom>                    WTF-SelectField, WTF-Timefield
                 class_instructor <Unecessary>       NA                                      NA (Implied at creation)
-                class student list.                 TBD                                     TBD
+                class student list.                 @SYN/TBD                                TBD
                 class_tardy_tolerance               Integer                                 WTF-NumberField
 
+            <MODIFIERS>
+
+            "Add Schedule"
+                NOTE: @DYN decorator denotes a dynamic form.
+                -------------------------------------------------------------------------------------------------------------------------------
+                <attribute name>                    <attribute type>                        <WTForms type>
+                class_day                           String(3)                               WTF-StringField
+                class_start_time                    Time <HH:MM>                            WTF-Timefield
+                class_end_time                      Time <HH:MM>                            WTF-Timefield
+
+            "Edit Schedule"
+
+                PART I
+                <if items = 1, skip>
+                schedule_select                     Combobox                                
+
+
+                RAISE value_error exception if any fields are empty. 
+                Same as above, but preload already existing data first, then select.
 
         b. ATTENDANCE - model containing attendance data. organized by date.
 
@@ -192,13 +211,29 @@ App requisites:
                             type: 1 : N one to many
                                 def. in INSTRUCTOR.
                                 called from INSTRUCTOR, Instructor.Class (query)
+            ii.         INSTRUCTOR - DEVICE
+                            type: N : 1 many to one
+                                def. in Instructor.
+                                called from INSTRUCTOR, Instructor.Device (query)
 
         e. DEVICE - model for infomration on scanner device.
 
             ID:                 - INT                                               NULLABLE?: False        PRIMARY_KEY
             last_synced         - DateTime                                          NULLABLE?: True
             version             - String(350)                                       NULLABLE?: True
-                checksum of schedule, class students, and other scanner-related data.
+                checksum of data of schedule, class students, and other scanner-related data.
+            Device SN           - String(15)                                        NULLABLE>: False
+            Device AES256 EMK   - String(256)                                       NULLABLE?: False
+            Device Active Status- Boolean                                           NULLABLE>: False        DEF: False
+            
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            |     R E L A T I O S H I P S      |
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+            i.          INSTRUCTOR - CLASS
+                            type: 1 : N one to many
+                                rel. def in Instructor.
+                                called from Instructor, Instructor.Device
             
 
     ii. Queries

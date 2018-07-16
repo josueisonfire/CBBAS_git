@@ -30,7 +30,7 @@ def send_password_reset_email(user):
 #function to send account confirmation request.
 def send_account_confirmation_email(user):
     token = user.generate_account_confirmation_token()
-    send_email(_('[SUNYKOREA CBBAT] Confirm Your Account'),
+    send_email(_('[SUNYKOREA CBBAT] Confirm      Account'),
                 sender=app.config['ADMINS'][0],
                 recipients=[user.email],
                text_body=render_template('email/confirm_email.txt',
